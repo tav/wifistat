@@ -1,8 +1,7 @@
 # Public Domain (-) 2012 The Wifistat Authors.
 # See the Wifistat UNLICENSE file for details.
 
-from os.path import join
-
+from os import listdir
 from bolt.api import *
 
 tmpl = """// Public Domain (-) 2012 The Wifistat Authors.
@@ -38,6 +37,9 @@ def build():
     f = open('html.go', 'wb')
     f.write(tmpl % html.replace('%JS%', js).replace('%CSS%', css))
     f.close()
+
+    files = ' '.join([x for x in listdir('.') if x.endswith('.go') and x != 'wifistat.go'])
+    local('go build wifistat.go %s' % files)
 
 @task
 def clean():
