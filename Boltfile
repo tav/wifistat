@@ -46,3 +46,4 @@ def clean():
     """clean wifistat build"""
 
     local('assetgen assetgen.yaml --clean')
+    local('rm -f html.go wifistat')
