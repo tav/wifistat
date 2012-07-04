@@ -1,0 +1,17 @@
+# Public Domain (-) 2012 The Wifistat Authors.
+# See the Wifistat UNLICENSE file for details.
+
+generate:
+
+- wifistat.js:
+    source: coffee/wifistat.coffee
+
+- wifistat.css:
+    source: sass/wifistat.sass
+
+css.compressed: yes
+css.embed.only: yes
+js.compressed: yes
+
+output.directory: build
+output.hashed: no
