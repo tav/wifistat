@@ -2,6 +2,7 @@ build/
 csv/
 html.go
 iaslogs/
+.sass-cache/
 log/
 run/
 wifistat
