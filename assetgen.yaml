@@ -3,6 +3,11 @@
 
 generate:
 
+- lib.js:
+    source: lib/js/d3.min.js
+    source: lib/js/d3.layout.min.js
+    source: lib/js/rickshaw.min.js
+
 - wifistat.js:
     source: coffee/wifistat.coffee
 
