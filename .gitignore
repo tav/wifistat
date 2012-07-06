@@ -1,4 +1,7 @@
 build/
+csv/
 html.go
-logs/
+iaslogs/
+log/
+run/
 wifistat
