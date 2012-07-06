@@ -8,6 +8,7 @@ import (
 	"amp/optparse"
 	"amp/runtime"
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	// "fmt"
 	"io"
@@ -21,11 +22,20 @@ import (
 	"time"
 )
 
+const (
+	csvUrlPrefix = "https://docs.google.com/spreadsheet/pub?key="
+	csvUrlSuffix = "&single=true&gid=0&output=csv"
+)
+
 var (
-	csvDir        string
-	parseLock     sync.RWMutex
-	parsedAlready bool
-	wifiLogDir    string
+	csvDir                string
+	devicesUrlKey         string
+	enableMemberAnalytics bool
+	membersUrlKey         string
+	openingUrlKey         string
+	parseLock             sync.RWMutex
+	parsedAlready         bool
+	wifiLogDir            string
 )
 
 func parseWifi() {
@@ -119,28 +129,63 @@ func parseWifi() {
 			_ = sent
 			current = current[0:0]
 			i += 1
-			// if i >= 0 {
-			// 	break
-			// }
+			if i >= 0 {
+				break
+			}
 		}
-		// break
+		break
 	}
 
 	log.Info("Finished parsing (%s)", time.Since(startTime))
 
 }
 
-func getCsvFile(name, urlpath string, force bool, timestamp time.Time) (*csv.Reader, error) {
+func getCsvFile(name, urlpath string, timestamp time.Time, force bool) (*csv.Reader, error) {
 	filename := filepath.Join(csvDir, name+timestamp.Format(".2006-01-02")+".csv")
-	file, err := os.Open(filename)
+	if !force {
+		file, err := os.Open(filename)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return nil, err
+			}
+		} else {
+			return csv.NewReader(file), nil
+		}
+	}
+	log.Info("Downloading %s.csv from Google Spreadsheets", name)
+	resp, err := http.Get(csvUrlPrefix + urlpath + csvUrlSuffix)
 	if err != nil {
 		return nil, err
 	}
-	return csv.NewReader(file), nil
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	err = ioutil.WriteFile(filename, body, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return csv.NewReader(bytes.NewBuffer(body)), nil
 }
 
 func parseCsv(force bool) {
-
+	now := time.Now()
+	_, err := getCsvFile("devices", devicesUrlKey, now, force)
+	if err != nil {
+		runtime.Error("Couldn't load devices.csv: %s", err)
+		return
+	}
+	_, err = getCsvFile("members", membersUrlKey, now, force)
+	if err != nil {
+		runtime.Error("Couldn't load members.csv: %s", err)
+		return
+	}
+	_, err = getCsvFile("opening", openingUrlKey, now, force)
+	if err != nil {
+		runtime.Error("Couldn't load opening.csv: %s", err)
+		return
+	}
 }
 
 func handleRequest(w http.ResponseWriter, req *http.Request) {
@@ -182,13 +227,48 @@ func main() {
 	wifi := opts.StringConfig("wifi-logs-dir", "iaslogs",
 		"the path to the Wi-Fi logs directory [iaslogs]")
 
+	membership := opts.BoolConfig("member-analytics", false,
+		"enable membership-based analytics")
+
+	devices := opts.StringConfig("devices-url", "",
+		"the url key for the devices.csv Google Spreadsheet")
+
+	members := opts.StringConfig("members-url", "",
+		"the url key for the members.csv Google Spreadsheet")
+
+	opening := opts.StringConfig("opening-url", "",
+		"the url key for the opening.csv Google Spreadsheet")
+
 	// Parse the command line options.
 	os.Args[0] = "wifistat"
 	_, root, _ := runtime.DefaultOpts("wifistat", opts, os.Args)
 
-	// Parse the logs.
-	csvDir = runtime.JoinPath(root, *csv)
+	// Compute option variables.
 	wifiLogDir = runtime.JoinPath(root, *wifi)
+	csvDir = runtime.JoinPath(root, *csv)
+	err := os.MkdirAll(csvDir, 0755)
+	if err != nil {
+		runtime.StandardError(err)
+	}
+
+	// Handle member analytics options.
+	if *membership {
+		enableMemberAnalytics = true
+		devicesUrlKey = *devices
+		if devicesUrlKey == "" {
+			runtime.Error("You need to specify the `devices-url` command-line option.")
+		}
+		membersUrlKey = *members
+		if membersUrlKey == "" {
+			runtime.Error("You need to specify the `members-url` command-line option.")
+		}
+		openingUrlKey = *opening
+		if openingUrlKey == "" {
+			runtime.Error("You need to specify the `opening-url` command-line option.")
+		}
+	}
+
+	// Parse the logs.
 	parseCsv(false)
 	parseWifi()
 
@@ -198,7 +278,7 @@ func main() {
 
 	// Start the web server.
 	log.Info("Running wifistat on %s", *addr)
-	err := http.ListenAndServe(*addr, nil)
+	err = http.ListenAndServe(*addr, nil)
 	if err != nil {
 		runtime.StandardError(err)
 	}
