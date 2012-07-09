@@ -4,19 +4,28 @@
 generate:
 
 - lib.js:
-    source: lib/js/d3.min.js
-    source: lib/js/d3.layout.min.js
-    source: lib/js/rickshaw.min.js
+    source: 
+        - lib/js/d3.min.js
+        - lib/js/d3.layout.min.js
+        - lib/js/jquery.min.js
+        - lib/js/rickshaw.min.js
 
 - wifistat.js:
     source: coffee/wifistat.coffee
+
+- lib.css:
+    source: 
+        - lib/sass/base.sass
+        - lib/sass/skeleton.sass
+        - lib/sass/layout.sass
+        - lib/sass/graph.sass
 
 - wifistat.css:
     source: sass/wifistat.sass
 
 css.compressed: yes
 css.embed.only: yes
-js.compressed: yes
+js.compressed: no
 
 output.directory: build
 output.hashed: no
