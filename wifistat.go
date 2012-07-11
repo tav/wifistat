@@ -140,7 +140,7 @@ func parseWifi() {
 
 }
 
-func getCsvFile(name, urlpath string, timestamp time.Time, force bool) (*csv.Reader, error) {
+func loadCsvFile(name, urlpath string, timestamp time.Time, force bool) (*csv.Reader, error) {
 	filename := filepath.Join(csvDir, name+timestamp.Format(".2006-01-02")+".csv")
 	if !force {
 		file, err := os.Open(filename)
@@ -169,23 +169,78 @@ func getCsvFile(name, urlpath string, timestamp time.Time, force bool) (*csv.Rea
 	return csv.NewReader(bytes.NewBuffer(body)), nil
 }
 
+func getCsvFile(name, urlpath string, timestamp time.Time, force bool) *csv.Reader {
+	file, err := loadCsvFile(name, urlpath, timestamp, force)
+	if err != nil {
+		log.Error("Couldn't load %s.csv: %s", name, err)
+		if !force {
+			runtime.Exit(1)
+		}
+		return nil
+	}
+	_, err = file.Read()
+	if err != nil {
+		log.Error("Error parsing header line from %s.csv: %s", name, err)
+		if !force {
+			runtime.Exit(1)
+		}
+		return nil
+	}
+	return file
+}
+
+type Member struct {
+	name string
+	id   string
+}
+
+var (
+	mac2member = make(map[string]Member)
+	member2mac = make(map[string]Member)
+)
+
 func parseCsv(force bool) {
 	now := time.Now()
-	_, err := getCsvFile("devices", devicesUrlKey, now, force)
-	if err != nil {
-		runtime.Error("Couldn't load devices.csv: %s", err)
+	file := getCsvFile("devices", devicesUrlKey, now, force)
+	if file == nil {
 		return
 	}
-	_, err = getCsvFile("members", membersUrlKey, now, force)
-	if err != nil {
-		runtime.Error("Couldn't load members.csv: %s", err)
-		return
+	var (
+		line []string
+		err  error
+	)
+	log.Info("Parsing devices.csv")
+	for {
+		line, err = file.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Error("Error parsing devices.csv: %s", err)
+			return
+		}
+		_ = line
 	}
-	_, err = getCsvFile("opening", openingUrlKey, now, force)
-	if err != nil {
-		runtime.Error("Couldn't load opening.csv: %s", err)
-		return
-	}
+	// file = getCsvFile("members", membersUrlKey, now, force)
+	// if file == nil {
+	// 	return
+	// }
+	// log.Info("Parsing devices.csv")
+	// for {
+	// 	line, err = file.Read()
+	// 	if err != nil {
+	// 		if err == io.EOF {
+	// 			break
+	// 		}
+	// 		log.Error("Error parsing devices.csv: %s", err)
+	// 		return
+	// 	}
+	// 	_ = line
+	// }
+	// file = getCsvFile("opening", openingUrlKey, now, force)
+	// if file == nil {
+	// 	return
+	// }
 }
 
 func handleRequest(w http.ResponseWriter, req *http.Request) {
